@@ -4,13 +4,16 @@
 `ecto/vcad/docs/plans/2026-07-07-kerf-browser-ordering-rail.md`; this copy
 is canonical and moves with the code.*
 
-kerf is the **execution plane** for agentic hardware procurement — the
-buyer agent's hands. A design surface (reference implementation:
-[vcad](https://github.com/ecto/vcad)) remains the **money plane**: quotes,
-DFM gates, the prepaid wallet, hash-bound spend authorizations approved by
-a human out-of-band, and receipts. The protocol between them is
+kerf is the **commerce plane** for agentic hardware procurement —
+*Stripe for metal*. A design surface (reference: [vcad](https://github.com/ecto/vcad))
+produces geometry, DFM, and files; kerf turns **files + config** into a
+manufactured part delivered, and hands back a receipt. Like Stripe, kerf
+is *integrated, not integrating*: the design surface and the buyer agent
+call kerf; kerf owns exactly the parts they must not touch — the supplier
+drivers, the payment instrument, the out-of-band human approval, and the
+evidence. The design surface never learns a CSS selector or touches a
+card; the buyer agent never sees a PAN. The protocol is
 [ACP-CM](https://github.com/ecto/vcad/blob/main/docs/agentic-commerce-custom-manufacturing.md).
-kerf never holds funds; the design surface never learns a CSS selector.
 
 ## The problem
 
@@ -23,10 +26,76 @@ undocumented, unstable, **untrusted** API and builds a driver stack for
 it: deterministic where possible, adaptive where necessary, evidence
 everywhere, fail-closed at every money boundary.
 
+## Stripe for metal — the boundary
+
+Stripe is the reference for how this composes. A merchant integrates
+Stripe with a `PaymentIntent`; Stripe owns the card networks, PCI scope,
+the dashboard where the human sees and disputes charges, idempotency, and
+the webhooks that report settlement. The merchant never touches a card
+network. kerf is the same shape for fabrication:
+
+| Stripe | kerf |
+|---|---|
+| `PaymentIntent` (amount + method) | `OrderIntent` (files + config + qty) |
+| N payment methods behind one API | N suppliers × {browser, api, email} behind one API |
+| the Dashboard (human's trusted, out-of-band surface) | kerf's approval + orders surface (the channel the agent can't control) |
+| idempotency keys → exactly-once charge | idempotency keys → exactly-once order |
+| webhooks → async settlement events | hooks → confirmation email, card settlement, tracking |
+| Issuing / merchant-of-record | Stripe Issuing *inside* kerf; kerf is MoR for the part |
+
+**The law that falls out of it: you integrate kerf; kerf does not
+integrate you.** The design surface (vcad) and the buyer agent are kerf's
+*merchants*. They call kerf. kerf never calls back into a design surface,
+and — critically — **the design surface does not orchestrate kerf.** An
+earlier draft had vcad's fabricate broker run a kerf quote job and vcad's
+`place_order` issue the card; that inverted the dependency and is dropped.
+
+### Three planes, one integrator
+
+1. **Design** — geometry, DFM, files, the `doc_hash`. vcad, or any CAD
+   tool, or an agent with a DXF. Standalone; knows nothing about kerf.
+2. **Commerce** — wallet, out-of-band human approval, card issuing, the
+   supplier drivers, evidence, receipts. **This is all kerf.** Money and
+   execution live *together* here for one non-negotiable reason (below).
+3. The **buyer agent** (Claude) is the integrator: it designs in plane 1,
+   exports files, and hands them to plane 2. It holds both MCPs as peers.
+
+**Why money and execution must be one service:** the card issuer has to
+hand the PAN to the runtime that *types* it, over a server-to-server link
+**the agent never mediates** — that is what keeps the agent from ever
+seeing card data. If the agent were the courier ("vcad issues a card, the
+agent passes it to kerf") the whole containment model collapses. So the
+wallet, the human approval surface, Stripe Issuing, and the browser
+runtime are one deployable: kerf. From the agent's side it is *just a kerf
+MCP* — `quote`, `authorize_spend` (proposes; the human approves in kerf's
+own surface), `place_order` (kerf verifies the mandate, issues the card,
+its runtime types it — all server-side).
+
+### What is shared — data, never calls
+
+The only thing that crosses the boundary is **schema**, not service calls:
+
+- **Receipts.** kerf emits commerce claims (`kerf/upload-hash`,
+  `kerf/card-settlement`, `kerf/tracking`) into the shared
+  [`vcad-receipt`](https://github.com/ecto/vcad/tree/main/crates/vcad-receipt)
+  format; vcad emits design claims into the same format; the agent (or
+  whoever wants the unified "receipt you can hear") assembles both. A
+  shared format, not a dependency.
+- **`doc_hash` provenance.** vcad computes it; the agent carries it into
+  the `OrderIntent`; kerf binds its mandate to `intent_hash` and records
+  `doc_hash` as provenance. Data flowing with the design, not a callback.
+
+### The non-agent path
+
+A human clicking "Order" in the vcad **web app** resolves the same way:
+the app is a *client* of kerf's API, exactly like the agent — not vcad's
+kernel or MCP embedding kerf. Every road leads to "integrate kerf," none
+to "kerf inside vcad."
+
 ## Four load-bearing decisions
 
-1. **The mandate compiles into the payment instrument.** At order time the
-   money plane debits its wallet and funds a **single-use virtual card**
+1. **The mandate compiles into the payment instrument.** At order time
+   kerf debits its wallet and funds a **single-use virtual card**
    (Stripe Issuing): amount-capped at the authorized total plus a shipping
    tolerance, merchant-locked on first settlement, ~48 h expiry. kerf
    receives a card *reference*; a server-side workflow step resolves it
@@ -84,7 +153,7 @@ kerf is an [eve](https://vercel.com/eve) project end to end (decision
   | lifecycle moment | primitive |
   |---|---|
   | upload / configure / assert / extract | step (retried, memoized) |
-  | human approves mandate (out-of-band) | hook ← money-plane webhook |
+  | human approves mandate (out-of-band) | hook ← kerf's approval surface |
   | CAPTCHA / 2FA / L1 buy click | hook ← human resolves in live view |
   | the L2 buy click | dedicated step, gated by the auditor step |
   | confirmation email | hook ← inbound-email webhook |
@@ -102,8 +171,9 @@ kerf is an [eve](https://vercel.com/eve) project end to end (decision
   allowlists (from the vendor manifest) are enforced at the session — the
   browser physically cannot navigate off-vendor.
 - **Agent-facing surface: remote MCP** (quote/order/track/cancel jobs +
-  live status). Design surfaces may also integrate service-to-service
-  (HTTP + signed webhooks) under the same job API.
+  live status) — the integration surface for the buyer agent. The vcad web
+  app (the non-agent path) is a client of the same HTTP + signed-webhook
+  job API. Both are *merchants* calling kerf; neither hosts it.
 
 ## Prompt-injection defense
 
@@ -177,7 +247,9 @@ is trusted beyond `unproven`.
   engine ✓. **Remaining:** the concrete Browser Use CDP `BrowserHost` (build
   + verify against a live session), then a first live deterministic run to
   confirm selectors and flip the capability from `unproven` to `green` on
-  merit. Then the design surface's broker consumes the `quoted` price.
+  merit. Then `quote` ships as a kerf MCP tool the buyer agent calls
+  directly (no vcad broker adapter) — the agent designs in vcad, exports
+  files, and calls kerf for a binding vendor price.
 - **Wave 1** — L1 assisted checkout (staged cart, human clicks buy in the
   live view), inbound-email oracle, evidence bundles.
 - **Wave 2** — L2: Stripe Issuing wired, auditor + one-shot placing step,

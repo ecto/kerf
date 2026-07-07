@@ -1,13 +1,20 @@
 # kerf
 
-**Agents that buy atoms.** A durable browser-agent ordering rail with
-fail-closed payment containment — the execution plane for
-[ACP-CM](https://github.com/ecto/vcad/blob/main/docs/agentic-commerce-custom-manufacturing.md)
+**Stripe for metal.** kerf turns `files + config` into a manufactured part
+delivered, and hands back a receipt — the commerce primitive for agentic
+hardware procurement, with fail-closed payment containment. Reference
+implementation of [ACP-CM](https://github.com/ecto/vcad/blob/main/docs/agentic-commerce-custom-manufacturing.md)
 (agentic commerce for custom manufacturing).
 
+You *integrate* kerf; kerf does not integrate you. A design surface (vcad,
+any CAD tool, an agent with a DXF) produces the geometry; kerf owns the
+parts it must not touch — the supplier drivers, the payment instrument, the
+out-of-band human approval, and the evidence. The design surface never
+learns a CSS selector or touches a card; the buyer agent never sees a PAN.
+
 A *kerf* is the width of material the cutting process removes — the part of
-the stock the process itself takes. This system is the cut between a design
-and delivered atoms: the ordering rail, and the margin it carries.
+the stock the process itself takes: the cut between a design and delivered
+atoms, and the margin it carries.
 
 > **Status: pre-alpha.** Wave 0 (see Roadmap) is in progress — the
 > contract layer and registry format are real and CI-enforced; the
@@ -116,12 +123,17 @@ Requires Node 24+ for eve dev; `npm run check` works on Node 22+.
 
 ## Relationship to vcad
 
-[vcad](https://github.com/ecto/vcad) is the reference **design surface and
-merchant of record**: quotes, DFM gates, the wallet, hash-bound spend
-authorizations, human approval UI, and receipts stay there. kerf is the
-**execution plane**: browser sessions, drivers, evidence. vcad never learns
-a CSS selector; kerf never holds funds. Any design surface — or any agent —
-can be a kerf client.
+[vcad](https://github.com/ecto/vcad) is a reference **design surface** —
+geometry, DFM, files, `doc_hash`. It is a *client* of kerf, not a host:
+vcad does not know kerf exists at the kernel level, and the buyer agent
+(Claude) is what integrates the two, carrying files from vcad to kerf and
+receipt claims back. kerf owns the whole **commerce plane** — wallet,
+out-of-band human approval, Stripe Issuing, the supplier drivers, and
+evidence — because the card issuer must hand the PAN to the runtime that
+types it over a link the agent never mediates. The only thing that crosses
+the boundary is the shared [`vcad-receipt`](https://github.com/ecto/vcad/tree/main/crates/vcad-receipt)
+schema (data, not calls). See [`docs/architecture.md`](docs/architecture.md),
+"Stripe for metal — the boundary."
 
 ## License
 
