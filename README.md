@@ -9,15 +9,9 @@ A *kerf* is the width of material the cutting process removes — the part of
 the stock the process itself takes. This system is the cut between a design
 and delivered atoms: the ordering rail, and the margin it carries.
 
-> **Status: incubating.** This tree currently lives at `kerf/` inside
-> [`ecto/vcad`](https://github.com/ecto/vcad) until the standalone repo
-> exists. Extract with history:
->
-> ```bash
-> # from a vcad checkout
-> git subtree split -P kerf -b kerf-extract
-> git push git@github.com:ecto/kerf.git kerf-extract:main
-> ```
+> **Status: pre-alpha.** Wave 0 (see Roadmap) is in progress — the
+> contract layer and registry format are real and CI-enforced; the
+> eve/browser glue is being brought up.
 
 ## Why
 
@@ -86,7 +80,7 @@ kerf/
 └── docs/architecture.md      # the founding design doc
 ```
 
-## Quickstart (standalone repo, after extraction)
+## Quickstart
 
 ```bash
 npm install
