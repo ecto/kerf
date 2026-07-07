@@ -1,5 +1,5 @@
 import { eveChannel } from "eve/channels/eve";
-import { localDev, placeholderAuth, vercelOidc } from "eve/channels/auth";
+import { localDev, none, vercelOidc } from "eve/channels/auth";
 
 export default eveChannel({
   auth: [
@@ -7,9 +7,11 @@ export default eveChannel({
     vercelOidc(),
     // Open on localhost for `eve dev` and the REPL; ignored in production.
     localDev(),
-    // This placeholder will not allow browser requests in production.
-    // Replace it with your app's auth provider, like Auth.js or Clerk,
-    // or use none() for a public demo.
-    placeholderAuth(),
+    // Wave 0: the channel itself is open; the production gate is Vercel
+    // Deployment Protection (Vercel Authentication) at the platform layer —
+    // enable it for Production in the project settings. Replace with real
+    // app auth (Auth.js/Clerk) before kerf is multi-user; the agent spends
+    // Browser Use credits per request, so do not ship none() unprotected.
+    none(),
   ],
 });
