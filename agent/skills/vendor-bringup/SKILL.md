@@ -1,3 +1,7 @@
+---
+description: Use when bringing a new vendor into the kerf registry or repairing a broken playbook — records a supervised browser run and distills it into deterministic playbook steps.
+---
+
 # vendor-bringup
 
 Bring a new vendor into the registry by recording one supervised run.
