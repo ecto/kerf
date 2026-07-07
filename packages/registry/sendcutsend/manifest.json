@@ -23,7 +23,7 @@
     }
   },
   "autonomy_ceiling": "L2",
-  "policy_notes": "Public instant-quote; sheet metal has no buyer API industry-wide. vcad-kernel-sheet encodes the SCS shop profile (published bend catalog), so uploads arrive pre-validated and should quote clean on the first try. STEP uploads auto-detect bends; DXF for flat parts. 6061 is not bendable at SCS — flat 6061 only. Recon 2026-07-07 (agentic probe): quote flow is the SPA at app.sendcutsend.com/customer; marketing CTA carries #/quote?action=register — VERIFY whether pricing is account-gated before recording the playbook; accepted uploads: .ai .dxf .dwg .eps .stp .step.",
+  "policy_notes": "Public instant-quote; sheet metal has no buyer API industry-wide. vcad-kernel-sheet encodes the SCS shop profile (published bend catalog), so uploads arrive pre-validated and should quote clean on the first try. STEP uploads auto-detect bends; DXF for flat parts. 6061 is not bendable at SCS — flat 6061 only. Recon 2026-07-07 (agentic probes): quote flow is the SPA route app.sendcutsend.com/customer#/quote and is fully usable WITHOUT an account (LOGIN link optional). Landing screen: 'Drop up to 10 files here' drop zone backed by ONE unnamed multi-file input[type=file] + a BROWSE FILES control; alternate paths on the same screen: AI Part Builder, template builder, custom-quote RFQ. Accepted uploads: .ai .dxf .dwg .eps .stp .step. Open engineering unknown: file delivery into the remote browser — synthetic in-page DataTransfer drop vs the Browser Use file API.",
   "config_schema": {
     "sheet_metal": {
       "material": {

@@ -2,18 +2,18 @@
   "format": 1,
   "vendor": "sendcutsend",
   "capability": "quote",
-  "version": "0.0.2",
-  "entry_url": "https://app.sendcutsend.com/customer",
+  "version": "0.0.3",
+  "entry_url": "https://app.sendcutsend.com/customer#/quote",
   "steps": [
     {
       "id": "open",
-      "do": { "action": "navigate", "url": "https://app.sendcutsend.com/customer" }
+      "do": { "action": "navigate", "url": "https://app.sendcutsend.com/customer#/quote" }
     },
     {
       "id": "upload-part",
       "do": {
         "action": "upload",
-        "selector": { "role": "button", "label": "TODO(recording): upload affordance" },
+        "selector": { "label": "BROWSE FILES", "css": "input[type=file]" },
         "file": { "from_intent": "/files/0" }
       }
     },
