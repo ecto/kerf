@@ -1,0 +1,13 @@
+{
+  "name": "@kerf/engine",
+  "version": "0.0.1",
+  "description": "kerf deterministic engine — executes playbooks against a BrowserHost, evaluating assertions fail-closed. The Tier-1 runner behind quote/order workflows.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@kerf/core": "*"
+  }
+}

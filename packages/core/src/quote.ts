@@ -9,9 +9,17 @@
 
 import type { Money } from "./intent";
 
-/** Whether the price is a local estimate or vendor-committed. Only
- *  `binding` quotes may gate real money. */
-export type PricingBasis = "estimate" | "binding";
+/**
+ * Whether a price is a local estimate, the fab's own displayed price, or a
+ * fab-committed contract. Per ACP-CM 0.2:
+ * - `estimate` — the design surface's own cost model. Never gates money.
+ * - `quoted`   — the fab's OWN displayed price for the exact bytes + config,
+ *                evidence-backed but held by no server-side reservation. What
+ *                the browser rail produces. May gate money only where the
+ *                fab's cart preserves the price through checkout.
+ * - `binding`  — a fab-committed price (native API or reservation).
+ */
+export type PricingBasis = "estimate" | "quoted" | "binding";
 
 export interface VendorQuote {
   quote_id: string;

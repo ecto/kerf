@@ -20,13 +20,16 @@
     "build:eve": "eve build",
     "dev:eve": "eve dev",
     "start:eve": "eve start",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p packages/core",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p packages/core && tsc -p packages/engine && tsc -p packages/registry",
     "validate": "node scripts/validate-registry.mjs",
-    "check": "npm run typecheck && npm run validate"
+    "test": "node --test packages/engine/src/*.test.ts",
+    "check": "npm run typecheck && npm run validate && npm run test"
   },
   "dependencies": {
     "@browser_use/eve": "^0.0.4",
     "@kerf/core": "*",
+    "@kerf/engine": "*",
+    "@kerf/registry": "*",
     "@radix-ui/react-use-controllable-state": "1.2.2",
     "@shikijs/core": "4.1.0",
     "@shikijs/engine-javascript": "4.1.0",

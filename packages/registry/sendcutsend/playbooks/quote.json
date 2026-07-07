@@ -2,7 +2,7 @@
   "format": 1,
   "vendor": "sendcutsend",
   "capability": "quote",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "entry_url": "https://app.sendcutsend.com/customer#/quote",
   "steps": [
     {
@@ -19,19 +19,18 @@
       "on_fail": "agent_repair"
     },
     {
-      "id": "confirm-units",
+      "id": "confirm-units-select",
       "do": {
         "action": "select",
-        "selector": { "text": "Confirm drawing units", "css": "input[type=radio]" },
-        "option_label": { "literal": "MM" }
+        "selector": { "text": "Confirm drawing units" },
+        "option_label": { "from_intent": "/config/units" }
       },
-      "money_adjacent": true,
-      "assert": [{ "subject": "units_selected", "op": "eq", "value": { "literal": "MM" } }],
-      "on_fail": "abort"
+      "on_fail": "agent_repair"
     },
     {
       "id": "confirm-units-apply",
-      "do": { "action": "click", "selector": { "role": "button", "text": "CONFIRM" } }
+      "do": { "action": "click", "selector": { "role": "button", "text": "CONFIRM" } },
+      "on_fail": "agent_repair"
     },
     {
       "id": "select-material-category",
@@ -58,22 +57,23 @@
         "selector": { "role": "link" },
         "option_label": { "from_intent": "/config/material" }
       },
-      "money_adjacent": true,
-      "assert": [
-        { "subject": "material_selected", "op": "eq", "value": { "from_intent": "/config/material" } }
-      ],
-      "on_fail": "abort"
+      "on_fail": "agent_repair"
     },
     {
       "id": "select-thickness",
       "do": {
         "action": "select",
         "selector": { "css": "input[type=radio]" },
-        "option_label": { "from_intent": "/config/thickness" }
+        "option_label": { "from_intent": "/config/thickness_label" }
       },
       "money_adjacent": true,
       "assert": [
-        { "subject": "thickness_selected", "op": "eq", "value": { "from_intent": "/config/thickness" } }
+        {
+          "subject": "thickness_checked",
+          "op": "eq",
+          "value": { "from_intent": "/config/thickness" },
+          "read": { "selector": { "css": "input[type=radio]:checked" }, "source": "value" }
+        }
       ],
       "on_fail": "abort"
     },
@@ -86,7 +86,12 @@
       },
       "money_adjacent": true,
       "assert": [
-        { "subject": "quantity_shown", "op": "eq", "value": { "from_intent": "/quantity" } }
+        {
+          "subject": "quantity_shown",
+          "op": "eq",
+          "value": { "from_intent": "/quantity" },
+          "read": { "selector": { "css": "input[type=number]" }, "source": "value", "parse": "int" }
+        }
       ],
       "on_fail": "abort"
     },

@@ -27,13 +27,23 @@ export type ValueRef =
   | { from_intent: string };
 
 export interface Assertion {
-  /** Extraction key (set by a prior `extract` step) to test. */
+  /** The value under test. When `read` is absent, this names a prior
+   *  `extract` step's bag key; when `read` is present, it is a label for
+   *  the live-read value (used only in messages). */
   subject: string;
   op: "eq" | "approx" | "lte" | "gte" | "matches" | "present";
   value?: ValueRef;
   /** For `approx` on money subjects: allowed delta in minor units
    *  (shipping/tax tolerance). */
   tolerance_minor?: number;
+  /** Read the subject LIVE from the page at assert time instead of from the
+   *  extraction bag — the readback pattern (fill a field, confirm the page
+   *  now shows it). `text` reads innerText; `value` reads an input's value. */
+  read?: {
+    selector: Selector;
+    source: "text" | "value";
+    parse?: "money" | "int" | "text";
+  };
 }
 
 export type StepAction =

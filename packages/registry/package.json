@@ -1,0 +1,13 @@
+{
+  "name": "@kerf/registry",
+  "version": "0.0.1",
+  "description": "kerf vendor registry — manifests, playbooks, and fixtures as importable data.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@kerf/core": "*"
+  }
+}
