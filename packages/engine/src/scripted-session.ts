@@ -12,7 +12,7 @@
  */
 
 import type { Selector } from "@kerf/core";
-import type { BrowserSession } from "./browser-host.ts";
+import type { BrowserHost, BrowserSession } from "./browser-host.ts";
 
 type Stage =
   | "await_upload"
@@ -136,5 +136,20 @@ export class ScriptedSession implements BrowserSession {
   async screenshot(): Promise<string> {
     this.screenshots += 1;
     return "iVBORw0KGgo="; // 1x1 PNG stand-in
+  }
+}
+
+/** A BrowserHost that hands out fresh ScriptedSessions — lets runQuoteJob be
+ *  tested end-to-end without a live browser. */
+export class ScriptedHost implements BrowserHost {
+  readonly key = "scripted";
+  last: ScriptedSession | null = null;
+  closed = 0;
+  async open(): Promise<ScriptedSession> {
+    this.last = new ScriptedSession();
+    return this.last;
+  }
+  async close(_session: BrowserSession): Promise<void> {
+    this.closed += 1;
   }
 }

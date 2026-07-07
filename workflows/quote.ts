@@ -1,35 +1,67 @@
 /**
- * The quote job — Wave 0. Zero money, zero account: walk a vendor's
- * public instant-quote flow with the intent's files and configuration,
- * extract a priced, snapshotted, evidence-backed VendorQuote.
+ * The quote job — Wave 0. Zero money, zero account: walk a vendor's public
+ * instant-quote flow with the intent's files and configuration, extract a
+ * priced, evidence-backed VendorQuote (pricing_basis "quoted", ACP-CM 0.2).
  *
- * This is the whole stack minus money: BrowserHost session, playbook
- * execution, assertions, Tier-2 fallback, evidence capture. It is also
- * the canary body — canaries run this with a fixture intent and
- * budget_minor 0.
+ * The orchestration lives in @kerf/engine (`runQuoteJob`), fully tested
+ * against a scripted host. This module binds it to the registry (manifest +
+ * recorded playbook + embedded fixture bytes) and to a BrowserHost supplied
+ * by the caller. The host is INJECTED rather than constructed here so the
+ * job stays host-agnostic: the scripted host drives it in tests today, and
+ * the Browser Use cloud CDP host drives it in production once that adapter is
+ * verified against a live session.
+ *
+ * `"use workflow"` makes the whole job a durable run. Step-level durability
+ * (wrapping each playbook action as a `"use step"`) is the next increment;
+ * the seam is the engine's per-step trace.
  */
 
-import type { ConfiguratorIntent, VendorQuote } from "@kerf/core";
+import type { BrowserHost, QuoteJobResult } from "@kerf/engine";
+import { runQuoteJob } from "@kerf/engine";
+import { getFixtureBytes, getVendor } from "@kerf/registry";
 
 export interface QuoteJobInput {
   job_id: string;
-  intent: ConfiguratorIntent;
+  /** Registry vendor id, e.g. "sendcutsend". */
+  vendor: string;
+  /** Which fixture intent to quote (Wave 0 canary uses "canary"). A live
+   *  order supplies a full intent instead; wired when ordering lands. */
+  intentKey?: string;
+  host: BrowserHost;
 }
 
-export async function quoteJob(input: QuoteJobInput): Promise<VendorQuote> {
+export async function quoteJob(input: QuoteJobInput): Promise<QuoteJobResult> {
   "use workflow";
 
-  // 1. SESSION_OPEN — BrowserHost session, allowlist from the manifest.
-  // 2. Per playbook step (each a memoized workflow step):
-  //      upload (hash bytes in flight → kerf/upload-hash claim),
-  //      select material/thickness by vendor-native label from the intent,
-  //      set quantity (assert), extract price (assert present, parse
-  //      money), screenshot the priced configurator.
-  // 3. Tier-2 agent summoned for any failed step; repair → playbook patch.
-  // 4. Return VendorQuote{ pricing_basis: "binding", evidence: [...] } —
-  //    the design surface's broker flips its sheet-metal options from
-  //    estimate to binding on this.
+  const vendor = getVendor(input.vendor);
+  const playbook = vendor.playbooks.quote;
+  if (!playbook) {
+    throw new Error(`kerf: vendor "${input.vendor}" has no quote playbook`);
+  }
+  const intent = vendor.intents[input.intentKey ?? "canary"];
+  if (!intent) {
+    throw new Error(
+      `kerf: vendor "${input.vendor}" has no intent "${input.intentKey ?? "canary"}"`,
+    );
+  }
 
-  void input;
-  throw new Error("kerf bringup: quote workflow is the Wave 0 deliverable — see docs/architecture.md");
+  return runQuoteJob({
+    host: input.host,
+    intent,
+    playbook,
+    quoteId: input.job_id,
+    // Fixture bytes are embedded in the registry (base64) — resolve the
+    // intent's file pointer to uploadable bytes with no filesystem.
+    resolveFile: (pointer: string) => {
+      const idx = Number.parseInt(pointer.replace(/^\/files\//, ""), 10);
+      const file = intent.files[idx];
+      if (!file) throw new Error(`kerf: no file at "${pointer}"`);
+      const bytes = getFixtureBytes(input.vendor, file.name);
+      return {
+        fileName: file.name,
+        bytesBase64: Buffer.from(bytes).toString("base64"),
+        ...(file.media_type ? { mediaType: file.media_type } : {}),
+      };
+    },
+  });
 }

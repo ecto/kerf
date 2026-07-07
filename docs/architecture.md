@@ -143,11 +143,41 @@ commerce surface — `configurator` (SendCutSend, JLCPCB), `catalog`
 "order from every supplier across domains" cashes out to: transports ×
 registry, not N bespoke integrations.
 
+## The deterministic engine (`@kerf/engine`)
+
+The Tier-1 runner that turns a recorded playbook into an executable,
+assertion-checked run with **no model in the loop**. It talks to an
+action-shaped `BrowserHost`/`BrowserSession` (navigate/click/fill/
+selectByLabel/uploadFile/readText/readValue/screenshot) — never a vendor
+SDK — so the browser substrate is swappable and the smart logic is testable
+without a live browser. The engine owns: ValueRef/JSON-pointer resolution
+(values flow intent→page, never page→decision), currency-anchored money
+parsing (a bare "11" in "Jul 11" is not a price — returns null, not 0),
+fail-closed assertion comparison, and the step loop. Every step's outcome
+is one of `completed` / `aborted` (a money-adjacent assertion failed —
+stop cold) / `needs_repair` (an `agent_repair` step failed → escalate to
+Tier 2) / `needs_takeover` (an `await_hook` → escalate to a human). The
+runner never guesses; a failure is always an escalation, never a proceed.
+
+`runQuoteJob` wraps the runner with session lifecycle, `intentHash` (the
+ACP-CM binding, key-order-invariant), and quote assembly, and `quoteFromRun`
+maps a completed run to a `VendorQuote` with `pricing_basis: "quoted"` — and
+refuses to fabricate a quote from any non-completed run. All of this is
+covered by tests that drive the **real committed SCS playbook** to a $5.58
+quote through a scripted model of the recorded flow, plus the abort and
+escalate paths. What the tests do **not** prove is that the selectors match
+live SCS or that a concrete `BrowserHost` drives real Chrome — only a live
+run proves those, and that live run is the gate before the quote capability
+is trusted beyond `unproven`.
+
 ## Roadmap
 
-- **Wave 0** — `quoteJob` + SCS quote playbook recorded via the
-  vendor-bringup skill. Zero money; upgrades the design surface's
-  sheet-metal pricing basis from `estimate` to `binding`.
+- **Wave 0** — *in progress.* Recorded SCS quote playbook ✓; deterministic
+  engine + `runQuoteJob` + tests ✓; `quoteJob` workflow composing registry +
+  engine ✓. **Remaining:** the concrete Browser Use CDP `BrowserHost` (build
+  + verify against a live session), then a first live deterministic run to
+  confirm selectors and flip the capability from `unproven` to `green` on
+  merit. Then the design surface's broker consumes the `quoted` price.
 - **Wave 1** — L1 assisted checkout (staged cart, human clicks buy in the
   live view), inbound-email oracle, evidence bundles.
 - **Wave 2** — L2: Stripe Issuing wired, auditor + one-shot placing step,

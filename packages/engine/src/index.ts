@@ -22,3 +22,6 @@ export type {
 } from "./runner.ts";
 export { quoteFromRun } from "./quote-from-run.ts";
 export type { QuoteFromRunArgs } from "./quote-from-run.ts";
+export { canonicalJson, sha256Hex, intentHash } from "./hash.ts";
+export { runQuoteJob } from "./quote-job.ts";
+export type { RunQuoteJobArgs, QuoteJobResult } from "./quote-job.ts";
