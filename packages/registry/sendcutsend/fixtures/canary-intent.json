@@ -6,15 +6,18 @@
   "files": [
     {
       "name": "kerf-canary-100x50.dxf",
-      "bytes": 0,
-      "sha256": "TODO(recording): pin after first successful upload",
+      "bytes": 304,
+      "sha256": "329b8434bb7bfb8f37e2c8902f4d33d4a68a127560427f212f9d1606f5f595ed",
       "media_type": "image/vnd.dxf"
     }
   ],
   "config": {
-    "material": "5052 H32 Aluminum",
-    "thickness": "0.125\"",
-    "quantity": 1
+    "units": "MM",
+    "material_category": "Metals",
+    "material_family": "Aluminum",
+    "material": "5052 H32",
+    "thickness": "ALU-125",
+    "thickness_label": ".125\" (3.2 MM)"
   },
   "quantity": 1,
   "ship_to": {
@@ -26,5 +29,5 @@
     "country": "US"
   },
   "budget_cap": { "currency": "USD", "amount_minor": 0 },
-  "_note": "Quote-only canary intent: budget_cap 0 — this intent can never satisfy an order job's mandate check; it exists to walk the quote playbook to a price. bytes/sha256 pinned at first recording."
+  "_note": "Quote-only canary intent: budget_cap 0 — can never satisfy an order mandate. Recorded reference (2026-07-07, anonymous session): unit price $5.58/ea @ qty 1, breaks 2/$4.68 10/$3.67 50/$2.64 100/$2.16 1000/$1.36, lead 'Arrives as soon as' +4 days. SCS parsed this DXF as 100 x 50 mm (vendor-validated fixture). Canary drift alarm: unit price moving >25% from reference warrants a registry review, not just a repair."
 }

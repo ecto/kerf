@@ -2,7 +2,7 @@
   "format": 1,
   "vendor": "sendcutsend",
   "capability": "quote",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "entry_url": "https://app.sendcutsend.com/customer#/quote",
   "steps": [
     {
@@ -15,66 +15,119 @@
         "action": "upload",
         "selector": { "label": "BROWSE FILES", "css": "input[type=file]" },
         "file": { "from_intent": "/files/0" }
-      }
+      },
+      "on_fail": "agent_repair"
     },
     {
-      "id": "select-material",
+      "id": "confirm-units",
       "do": {
         "action": "select",
-        "selector": { "label": "TODO(recording): material picker" },
+        "selector": { "text": "Confirm drawing units", "css": "input[type=radio]" },
+        "option_label": { "literal": "MM" }
+      },
+      "money_adjacent": true,
+      "assert": [{ "subject": "units_selected", "op": "eq", "value": { "literal": "MM" } }],
+      "on_fail": "abort"
+    },
+    {
+      "id": "confirm-units-apply",
+      "do": { "action": "click", "selector": { "role": "button", "text": "CONFIRM" } }
+    },
+    {
+      "id": "select-material-category",
+      "do": {
+        "action": "select",
+        "selector": { "role": "link" },
+        "option_label": { "from_intent": "/config/material_category" }
+      },
+      "on_fail": "agent_repair"
+    },
+    {
+      "id": "select-material-family",
+      "do": {
+        "action": "select",
+        "selector": { "role": "link" },
+        "option_label": { "from_intent": "/config/material_family" }
+      },
+      "on_fail": "agent_repair"
+    },
+    {
+      "id": "select-alloy",
+      "do": {
+        "action": "select",
+        "selector": { "role": "link" },
         "option_label": { "from_intent": "/config/material" }
-      }
+      },
+      "money_adjacent": true,
+      "assert": [
+        { "subject": "material_selected", "op": "eq", "value": { "from_intent": "/config/material" } }
+      ],
+      "on_fail": "abort"
     },
     {
       "id": "select-thickness",
       "do": {
         "action": "select",
-        "selector": { "label": "TODO(recording): thickness picker" },
+        "selector": { "css": "input[type=radio]" },
         "option_label": { "from_intent": "/config/thickness" }
-      }
+      },
+      "money_adjacent": true,
+      "assert": [
+        { "subject": "thickness_selected", "op": "eq", "value": { "from_intent": "/config/thickness" } }
+      ],
+      "on_fail": "abort"
     },
     {
       "id": "set-quantity",
       "do": {
         "action": "fill",
-        "selector": { "label": "TODO(recording): quantity input" },
+        "selector": { "css": "input[type=number]" },
         "value": { "from_intent": "/quantity" }
       },
       "money_adjacent": true,
       "assert": [
-        {
-          "subject": "quantity_shown",
-          "op": "eq",
-          "value": { "from_intent": "/quantity" }
-        }
+        { "subject": "quantity_shown", "op": "eq", "value": { "from_intent": "/quantity" } }
       ],
       "on_fail": "abort"
     },
     {
-      "id": "extract-price",
+      "id": "extract-unit-price",
       "do": {
         "action": "extract",
-        "selector": { "text": "TODO(recording): unit/total price node" },
-        "into": "total_price",
+        "selector": { "text": "/ea" },
+        "into": "unit_price",
         "parse": "money"
       },
       "money_adjacent": true,
-      "assert": [{ "subject": "total_price", "op": "present" }],
+      "assert": [{ "subject": "unit_price", "op": "present" }],
+      "on_fail": "abort"
+    },
+    {
+      "id": "extract-subtotal",
+      "do": {
+        "action": "extract",
+        "selector": { "text": "Subtotal" },
+        "into": "subtotal",
+        "parse": "money"
+      },
+      "money_adjacent": true,
+      "assert": [{ "subject": "subtotal", "op": "present" }],
       "on_fail": "abort"
     },
     {
       "id": "extract-lead-time",
       "do": {
         "action": "extract",
-        "selector": { "text": "TODO(recording): lead time / ship estimate" },
+        "selector": { "text": "Arrives as soon as" },
         "into": "lead_time",
         "parse": "text"
-      }
+      },
+      "on_fail": "agent_repair"
     },
     {
       "id": "snapshot-quote",
       "do": { "action": "screenshot", "into": "priced_configurator" }
     }
   ],
-  "fixtures": []
+  "fixtures": ["../fixtures/kerf-canary-100x50.dxf", "../fixtures/canary-intent.json"]
 }

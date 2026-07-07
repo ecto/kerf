@@ -10,7 +10,8 @@
     "quote": {
       "transport": "browser",
       "playbook": "playbooks/quote.json",
-      "status": "unproven"
+      "status": "green",
+      "last_verified_at": "2026-07-07"
     },
     "order": {
       "transport": "browser",
@@ -23,21 +24,31 @@
     }
   },
   "autonomy_ceiling": "L2",
-  "policy_notes": "Public instant-quote; sheet metal has no buyer API industry-wide. vcad-kernel-sheet encodes the SCS shop profile (published bend catalog), so uploads arrive pre-validated and should quote clean on the first try. STEP uploads auto-detect bends; DXF for flat parts. 6061 is not bendable at SCS — flat 6061 only. Recon 2026-07-07 (agentic probes): quote flow is the SPA route app.sendcutsend.com/customer#/quote and is fully usable WITHOUT an account (LOGIN link optional). Landing screen: 'Drop up to 10 files here' drop zone backed by ONE unnamed multi-file input[type=file] + a BROWSE FILES control; alternate paths on the same screen: AI Part Builder, template builder, custom-quote RFQ. Accepted uploads: .ai .dxf .dwg .eps .stp .step. Open engineering unknown: file delivery into the remote browser — synthetic in-page DataTransfer drop vs the Browser Use file API.",
+  "policy_notes": "Public instant-quote; sheet metal has no buyer API industry-wide. vcad-kernel-sheet encodes the SCS shop profile (published bend catalog), so uploads arrive pre-validated and should quote clean on the first try. STEP uploads auto-detect bends; DXF for flat parts. 6061 is not bendable at SCS — flat 6061 only. Recon 2026-07-07 (agentic probes): quote flow is the SPA route app.sendcutsend.com/customer#/quote and is fully usable WITHOUT an account (LOGIN link optional). Landing screen: 'Drop up to 10 files here' drop zone backed by ONE unnamed multi-file input[type=file] + a BROWSE FILES control; alternate paths on the same screen: AI Part Builder, template builder, custom-quote RFQ. Accepted uploads: .ai .dxf .dwg .eps .stp .step. RESOLVED (3rd probe, recorded): file delivery works via synthetic in-page upload — one Runtime.evaluate builds File from bytes, DataTransfer, sets input.files, dispatches change (bubbles:true); the Vue/Bulma SPA parses immediately and echoes the detected bounding box (fixture read as 100x50 mm). Post-upload flow: units-confirmation modal (INCH/MM, CONFIRM) -> material category -> family -> alloy -> thickness radio tiles (stable value codes, e.g. ALU-125) -> priced configurator (qty number input, $/ea, volume breaks, Subtotal, 'Arrives as soon as' date, ADD TO CART). Pricing fully anonymous.",
   "config_schema": {
     "sheet_metal": {
+      "units": { "kind": "enum", "values": ["MM", "INCH"], "note": "units-confirmation modal; kerf intents are mm" },
+      "material_category": {
+        "kind": "enum",
+        "values": ["Metals", "Composites", "Plastics", "Wood And MDF", "Rubber And Gasket"],
+        "note": "recorded 2026-07-07"
+      },
+      "material_family": {
+        "kind": "enum_from_site",
+        "note": "per category; Metals: Aluminum, Brass, Copper, Stainless Steel, Steel, Titanium (recorded 2026-07-07)"
+      },
       "material": {
         "kind": "enum_from_site",
-        "note": "vendor-native label, e.g. \"5052 H32 Aluminum\""
+        "note": "alloy label; Aluminum: 2024 T3, 5052 H32, 6061 T6, 7075 T6, MIC-6 (recorded 2026-07-07)"
       },
       "thickness": {
         "kind": "enum_from_site",
-        "note": "vendor-native label, e.g. \"0.125\" (3.175mm)\""
+        "note": "STABLE radio value code, e.g. ALU-125 for .125\" (3.2 MM); aluminum range ALU-040..ALU-500 (recorded 2026-07-07)"
       },
       "finish": {
         "kind": "enum_from_site",
         "optional": true,
-        "note": "e.g. powder coat color; omit for raw. Coatings damp the ring — leave resonant parts raw."
+        "note": "post-configurator step (not yet recorded); coatings damp the ring — leave resonant parts raw."
       },
       "quantity": { "kind": "int", "min": 1 }
     }
