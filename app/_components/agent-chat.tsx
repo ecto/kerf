@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
 
-const AGENT_NAME = "kerf-probe";
+const AGENT_NAME = "kerf";
 
 type AgentStatus = ReturnType<typeof useEveAgent>["status"];
 

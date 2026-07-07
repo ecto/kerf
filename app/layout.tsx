@@ -20,7 +20,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "kerf-probe",
+  title: "kerf",
   description: "A Next.js starter for eve agents with AI Elements.",
 };
 
