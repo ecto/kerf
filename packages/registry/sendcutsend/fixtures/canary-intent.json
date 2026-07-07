@@ -1,0 +1,30 @@
+{
+  "kind": "configurator",
+  "idempotency_key": "kerf-canary-sendcutsend-quote",
+  "vendor": "sendcutsend",
+  "process": "sheet_metal",
+  "files": [
+    {
+      "name": "kerf-canary-100x50.dxf",
+      "bytes": 0,
+      "sha256": "TODO(recording): pin after first successful upload",
+      "media_type": "image/vnd.dxf"
+    }
+  ],
+  "config": {
+    "material": "5052 H32 Aluminum",
+    "thickness": "0.125\"",
+    "quantity": 1
+  },
+  "quantity": 1,
+  "ship_to": {
+    "name": "canary — never ships",
+    "line1": "n/a",
+    "city": "n/a",
+    "region": "NV",
+    "postal_code": "89501",
+    "country": "US"
+  },
+  "budget_cap": { "currency": "USD", "amount_minor": 0 },
+  "_note": "Quote-only canary intent: budget_cap 0 — this intent can never satisfy an order job's mandate check; it exists to walk the quote playbook to a price. bytes/sha256 pinned at first recording."
+}
