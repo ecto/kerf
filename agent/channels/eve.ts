@@ -1,5 +1,5 @@
 import { eveChannel } from "eve/channels/eve";
-import { localDev, none, vercelOidc } from "eve/channels/auth";
+import { localDev, vercelOidc } from "eve/channels/auth";
 
 export default eveChannel({
   auth: [
@@ -7,11 +7,9 @@ export default eveChannel({
     vercelOidc(),
     // Open on localhost for `eve dev` and the REPL; ignored in production.
     localDev(),
-    // Wave 0: the channel itself is open; the production gate is Vercel
-    // Deployment Protection (Vercel Authentication) at the platform layer —
-    // enable it for Production in the project settings. Replace with real
-    // app auth (Auth.js/Clerk) before kerf is multi-user; the agent spends
-    // Browser Use credits per request, so do not ship none() unprotected.
-    none(),
+    // NO catch-all: production browser requests 401. The public chat surface
+    // is shut down for Wave 0 (no paid deployment protection needed). Rails:
+    // eve TUI over Vercel OIDC, scheduled canaries, and (soon) MCP. Chat
+    // returns behind real app auth (Auth.js/Clerk) when kerf is multi-user.
   ],
 });
