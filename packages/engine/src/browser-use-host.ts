@@ -100,29 +100,36 @@ export class BrowserUseHost implements BrowserHost {
     this.client ??= new BrowserUse({ apiKey: this.apiKey });
 
     // Provision, then poll until the CDP endpoint is live (same cadence as
-    // @browser_use/eve: up to 30 × 1 s).
-    let b = await this.client.browsers.create({ timeout: this.timeoutMinutes });
-    for (let i = 0; i < 30 && !b.cdpUrl; i++) {
-      await sleep(1000);
-      b = await this.client.browsers.get(b.id);
-    }
-    if (!b.cdpUrl) {
-      throw new Error(`kerf: cloud browser ${b.id} did not expose a cdpUrl in time`);
-    }
-
-    const wsUrl = await resolveWebSocketUrl(b.cdpUrl);
-    const cdp = await CdpConnection.dial(wsUrl);
+    // @browser_use/eve: up to 30 × 1 s). From the moment create() returns,
+    // ANY failure before a session is handed out best-effort stops the
+    // cloud browser — a session we never return must not keep billing.
+    const created = await this.client.browsers.create({ timeout: this.timeoutMinutes });
     try {
-      const sessionId = await cdp.attachFirstPage();
-      await cdp.send("Page.enable", {}, sessionId);
-      await cdp.send("Runtime.enable", {}, sessionId);
-      return new BrowserUseSession(b.id, b.liveUrl ?? null, cdp, sessionId, {
-        elementTimeoutMs: this.elementTimeoutMs,
-        navigateTimeoutMs: this.navigateTimeoutMs,
-      });
+      let b = created;
+      for (let i = 0; i < 30 && !b.cdpUrl; i++) {
+        await sleep(1000);
+        b = await this.client.browsers.get(b.id);
+      }
+      if (!b.cdpUrl) {
+        throw new Error(`kerf: cloud browser ${b.id} did not expose a cdpUrl in time`);
+      }
+
+      const wsUrl = await resolveWebSocketUrl(b.cdpUrl);
+      const cdp = await CdpConnection.dial(wsUrl);
+      try {
+        const sessionId = await cdp.attachFirstPage();
+        await cdp.send("Page.enable", {}, sessionId);
+        await cdp.send("Runtime.enable", {}, sessionId);
+        return new BrowserUseSession(b.id, b.liveUrl ?? null, cdp, sessionId, {
+          elementTimeoutMs: this.elementTimeoutMs,
+          navigateTimeoutMs: this.navigateTimeoutMs,
+        });
+      } catch (err) {
+        cdp.dispose();
+        throw err; // the outer catch stops the cloud browser
+      }
     } catch (err) {
-      cdp.dispose();
-      await this.stopQuietly(b.id);
+      await this.stopQuietly(created.id);
       throw err;
     }
   }
