@@ -72,6 +72,27 @@ export function assertTransition(from: JobState, to: JobState): void {
   }
 }
 
+/**
+ * Kind-aware transition guard — what stores must call. The shared table
+ * lists STAGED → DELIVERED, but that edge exists ONLY for quote-kind jobs
+ * (the priced, evidence-backed quote is the deliverable). For every other
+ * kind — orders above all — DELIVERED stays reachable only via TRACKING,
+ * preserving "DELIVERED implies the order was confirmed by two oracles".
+ */
+export function assertTransitionForKind(
+  kind: JobKind,
+  from: JobState,
+  to: JobState,
+): void {
+  assertTransition(from, to);
+  if (from === "STAGED" && to === "DELIVERED" && kind !== "quote") {
+    throw new Error(
+      `kerf: illegal job transition STAGED -> DELIVERED for kind "${kind}" — ` +
+        "only quote jobs terminate at STAGED; orders require the two-oracle CONFIRMED path",
+    );
+  }
+}
+
 /** The durable record written BEFORE the buy click executes. Its presence
  *  on any resumed run forbids re-entering PLACING. */
 export interface PlacingAttempt {

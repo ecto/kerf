@@ -72,6 +72,28 @@ test("MemoryJobStore: the quote-job walk QUEUED→…→DELIVERED is legal", asy
   assert.equal(rec!.state, "DELIVERED");
 });
 
+test("MemoryJobStore: STAGED → DELIVERED is quote-only — order jobs are refused", async () => {
+  const store = new MemoryJobStore(new Map());
+  await store.create({ ...record("j-order"), kind: "order" });
+
+  for (const state of ["SESSION_OPEN", "STAGING", "STAGED"] as const) {
+    await store.update("j-order", { state });
+  }
+  // The shared table lists the edge, but the store's kind-aware guard
+  // keeps DELIVERED-implies-confirmed intact for the order machinery.
+  await assert.rejects(
+    store.update("j-order", { state: "DELIVERED" }),
+    /STAGED -> DELIVERED for kind "order"/,
+  );
+  assert.equal((await store.get("j-order"))!.state, "STAGED");
+
+  // DELIVERED via the two-oracle path is still legal for orders.
+  for (const state of ["AUDIT", "PLACING", "CONFIRMING", "CONFIRMED", "TRACKING", "DELIVERED"] as const) {
+    await store.update("j-order", { state });
+  }
+  assert.equal((await store.get("j-order"))!.state, "DELIVERED");
+});
+
 test("MemoryJobStore: same-state patch attaches data without consulting the table", async () => {
   const store = new MemoryJobStore(new Map());
   await store.create(record("j1"));

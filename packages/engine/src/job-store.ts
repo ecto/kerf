@@ -9,7 +9,7 @@
  */
 
 import type { EvidenceBundle, JobKind, JobState, VendorQuote } from "@kerf/core";
-import { assertTransition } from "@kerf/core";
+import { assertTransitionForKind } from "@kerf/core";
 
 /** One job's queryable record. Mirrors the state machine in @kerf/core;
  *  `quote`/`evidence` are attached as the run produces them. */
@@ -44,8 +44,10 @@ export type JobRecordPatch = Partial<
  * The store contract. Implementations must:
  *   - reject `create` for an id that already exists (ids are never reused);
  *   - reject `update` for an unknown id;
- *   - guard every state change with `assertTransition` (same-state patches
- *     that only attach data are allowed and do not consult the table).
+ *   - guard every state change with `assertTransitionForKind` (same-state
+ *     patches that only attach data are allowed and do not consult the
+ *     table). The kind-aware guard is what keeps STAGED → DELIVERED a
+ *     quote-only short-circuit — order jobs must take the confirmed path.
  */
 export interface JobStore {
   create(rec: JobRecord): Promise<void>;
@@ -99,7 +101,7 @@ export class MemoryJobStore implements JobStore {
       throw new Error(`kerf: cannot update unknown job "${id}"`);
     }
     if (patch.state !== undefined && patch.state !== rec.state) {
-      assertTransition(rec.state, patch.state);
+      assertTransitionForKind(rec.kind, rec.state, patch.state);
     }
     const next: JobRecord = {
       ...rec,
