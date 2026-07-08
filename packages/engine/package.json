@@ -8,6 +8,7 @@
   "types": "src/index.ts",
   "sideEffects": false,
   "dependencies": {
-    "@kerf/core": "*"
+    "@kerf/core": "*",
+    "browser-use-sdk": "^3.8.4"
   }
 }
