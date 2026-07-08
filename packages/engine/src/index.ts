@@ -24,9 +24,16 @@ export type {
 } from "./runner.ts";
 export { quoteFromRun } from "./quote-from-run.ts";
 export type { QuoteFromRunArgs } from "./quote-from-run.ts";
-export { canonicalJson, sha256Hex, intentHash } from "./hash.ts";
+export { canonicalJson, sha256Hex, sha256HexBytes, intentHash } from "./hash.ts";
 export { runQuoteJob } from "./quote-job.ts";
 export type { RunQuoteJobArgs, QuoteJobResult } from "./quote-job.ts";
 export { ScriptedHost, ScriptedSession } from "./scripted-session.ts";
 export { MemoryJobStore } from "./job-store.ts";
 export type { JobRecord, JobRecordPatch, JobStore } from "./job-store.ts";
+export { handleQuoteRequest, HostUnavailableError } from "./quote-api.ts";
+export type {
+  QuoteApiDeps,
+  QuoteApiResult,
+  QuoteApiVendor,
+  QuoteResponseBody,
+} from "./quote-api.ts";

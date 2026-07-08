@@ -240,16 +240,45 @@ live SCS or that a concrete `BrowserHost` drives real Chrome — only a live
 run proves those, and that live run is the gate before the quote capability
 is trusted beyond `unproven`.
 
+## The HTTP API (Wave 0)
+
+The job API clients integrate against (the vcad web app and the buyer
+agent are both *merchants* calling it):
+
+- `POST /api/quote` — `{ vendor, intent? | intentKey?, mode?: "scripted" |
+  "live" }` → `{ job_id, state, quote, intent_hash, live_url, evidence:
+  { items, claims } }`. Posted intents inline file bytes as
+  `bytes_base64` per FileRef (wire-only field, stripped before
+  hashing/storage); the bytes must hash to the FileRef's `sha256` or the
+  request is rejected 400 — the upload-hash discipline enforced at the
+  door. `mode: "scripted"` (default) runs the deterministic fixture host;
+  `mode: "live"` runs the Browser Use cloud host and answers 503 when no
+  `BROWSER_USE_API_KEY` is deployed. Auth is a bearer token
+  (`KERF_API_TOKEN`); unset = open dev mode, logged loudly.
+- `GET /api/jobs/:id` — the JobRecord (state machine per @kerf/core; a
+  successful quote job terminates `DELIVERED`, the quote is the
+  deliverable). Evidence is served separately:
+- `GET /api/jobs/:id/evidence` — the hash-manifested `EvidenceBundle`
+  (`kerf/upload-hash` + `kerf/quote-extraction` claims; items are
+  manifests — the artifact store for payloads is a later wave).
+
+The request path is `handleQuoteRequest` in `@kerf/engine` — registry,
+host, and job store injected, tested end-to-end against the scripted
+host. The Wave-0 job store is in-memory per warm instance (quote jobs are
+deterministic and re-runnable; orders will require the durable store).
+
 ## Roadmap
 
 - **Wave 0** — *in progress.* Recorded SCS quote playbook ✓; deterministic
   engine + `runQuoteJob` + tests ✓; `quoteJob` workflow composing registry +
-  engine ✓. **Remaining:** the concrete Browser Use CDP `BrowserHost` (build
-  + verify against a live session), then a first live deterministic run to
-  confirm selectors and flip the capability from `unproven` to `green` on
-  merit. Then `quote` ships as a kerf MCP tool the buyer agent calls
-  directly (no vcad broker adapter) — the agent designs in vcad, exports
-  files, and calls kerf for a binding vendor price.
+  engine ✓; the Browser Use cloud CDP `BrowserHost` (`browser-use-host.ts`,
+  key-gated, in-page selector resolution per the host contract) ✓; the HTTP
+  quote API + job store + evidence bundles ✓. **Remaining:** a first live
+  deterministic run through the cloud host to confirm the SCS selectors and
+  flip the capability from `unproven` to `green` on merit. Then `quote`
+  ships as a kerf MCP tool the buyer agent calls directly (no vcad broker
+  adapter) — the agent designs in vcad, exports files, and calls kerf for a
+  binding vendor price.
 - **Wave 1** — L1 assisted checkout (staged cart, human clicks buy in the
   live view), inbound-email oracle, evidence bundles.
 - **Wave 2** — L2: Stripe Issuing wired, auditor + one-shot placing step,

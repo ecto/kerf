@@ -12,7 +12,8 @@
     "skipLibCheck": true,
     "types": ["node"],
     "paths": {
-      "@kerf/core": ["../core/src/index.ts"]
+      "@kerf/core": ["../core/src/index.ts"],
+      "@kerf/registry": ["../registry/index.ts"]
     }
   },
   "include": ["src/**/*.ts"]
