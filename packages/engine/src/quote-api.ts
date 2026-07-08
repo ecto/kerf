@@ -166,12 +166,16 @@ export async function handleQuoteRequest(
 
   const sink = new MemoryEvidenceSink();
   const resolvedBytes = new Map<number, Uint8Array>();
+  /** Files the playbook actually resolved for upload — the only ones the
+   *  upload-hash claim may assert were fed to the vendor. */
+  const uploadedIndices = new Set<number>();
   const resolveFile = (pointer: string) => {
     const idx = Number.parseInt(pointer.replace(/^\/files\//, ""), 10);
     const file = intent.files[idx];
     if (!file) throw new Error(`kerf: no file at "${pointer}"`);
     const bytes = bytesFor(idx, file);
     resolvedBytes.set(idx, bytes);
+    uploadedIndices.add(idx);
     return {
       fileName: file.name,
       bytesBase64: Buffer.from(bytes).toString("base64"),
@@ -189,8 +193,10 @@ export async function handleQuoteRequest(
       evidence: sink,
     });
 
-    // Hash every file the playbook actually fed the vendor (plus any it
-    // never reached, from the same resolver) for the upload-hash oracle.
+    // Hash every file for the upload-hash oracle. Files the playbook never
+    // reached are backfilled from the same resolver so the bundle can still
+    // verify them against their FileRef — but they are marked ingress-only
+    // in the claim, never asserted as uploaded (see buildEvidenceBundle).
     for (const [idx, file] of intent.files.entries()) {
       if (!resolvedBytes.has(idx)) resolvedBytes.set(idx, bytesFor(idx, file));
     }
@@ -199,6 +205,7 @@ export async function handleQuoteRequest(
       createdAt: now(),
       intent,
       resolvedBytes,
+      uploadedIndices,
       sink,
       run: result.run,
       quote: result.quote,
@@ -257,6 +264,12 @@ export async function handleQuoteRequest(
 /* ------------------------------------------------------------------ */
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** Posted-intent size caps — CAD files for a quote are megabytes, not
+ *  gigabytes. Enforced on the DECLARED sizes before any base64 decode so a
+ *  hostile payload is rejected before it costs a second in-memory copy. */
+const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
+const MAX_TOTAL_BYTES = 60 * 1024 * 1024; // 60 MB per intent
 
 /** Placeholder for quote-only intents that omit ship_to — a quote job
  *  never ships anything, and the field is excluded from intent_hash. */
@@ -322,6 +335,27 @@ async function validatePostedIntent(
     return { error: "intent.idempotency_key must be a string when present" };
   }
 
+  // Size caps first, on the DECLARED bytes, before any base64 decode —
+  // the decoded length is still verified against the declaration below.
+  let declaredTotal = 0;
+  for (const [i, f] of raw.files.entries()) {
+    if (!isRecord(f)) return { error: `intent.files[${i}] must be an object` };
+    if (typeof f.bytes !== "number" || !Number.isInteger(f.bytes) || f.bytes < 1) {
+      return { error: `intent.files[${i}].bytes must be a positive integer` };
+    }
+    if (f.bytes > MAX_FILE_BYTES) {
+      return {
+        error: `intent.files[${i}].bytes (${f.bytes}) exceeds the ${MAX_FILE_BYTES}-byte per-file cap`,
+      };
+    }
+    declaredTotal += f.bytes;
+  }
+  if (declaredTotal > MAX_TOTAL_BYTES) {
+    return {
+      error: `intent.files declare ${declaredTotal} bytes total, over the ${MAX_TOTAL_BYTES}-byte cap`,
+    };
+  }
+
   const files: FileRef[] = [];
   const bytesByIndex = new Map<number, Uint8Array>();
   for (const [i, f] of raw.files.entries()) {
@@ -340,6 +374,14 @@ async function validatePostedIntent(
         error:
           `intent.files[${i}].bytes_base64 is required for posted intents — ` +
           "the API uploads exactly the bytes you send, hash-checked",
+      };
+    }
+    // Pre-decode guard: base64 for n bytes is 4·ceil(n/3) chars, so a
+    // payload meaningfully longer than the declared size implies is
+    // rejected before we allocate the decoded copy.
+    if (f.bytes_base64.length > Math.ceil(f.bytes / 3) * 4 + 4) {
+      return {
+        error: `intent.files[${i}].bytes_base64 is larger than the declared ${f.bytes} bytes imply`,
       };
     }
     let decoded: Uint8Array;
@@ -396,6 +438,9 @@ interface BundleArgs {
   createdAt: string;
   intent: ConfiguratorIntent;
   resolvedBytes: Map<number, Uint8Array>;
+  /** Indices the playbook actually resolved for upload; everything else
+   *  was only verified at the API/registry boundary. */
+  uploadedIndices: Set<number>;
   sink: MemoryEvidenceSink;
   run: { outcome: string; stoppedAt?: string; reason?: string };
   quote: VendorQuote | null;
@@ -407,15 +452,20 @@ interface BundleArgs {
  * Wave-0 scope: items are MANIFEST-ONLY (id, sha256, size) — the artifact
  * store that would persist the screenshot payloads does not exist yet, so
  * the bytes are hashed and dropped. Claims:
- *   - kerf/upload-hash: the exact bytes fed to the vendor's file input
- *     hash to each FileRef.sha256 (posted intents were already checked at
- *     the door; registry fixtures are re-verified here — fail-closed).
+ *   - kerf/upload-hash: for files the playbook actually fed to the vendor's
+ *     file input (`upload:` items), the exact uploaded bytes hash to each
+ *     FileRef.sha256. Files the run never uploaded are verified at the
+ *     API/registry boundary only (`ingress:` items) and the claim SAYS SO —
+ *     observed marks them, reason scopes the verdict. No claim ever implies
+ *     vendor-input verification that did not happen. Fail-closed either
+ *     way: missing or mismatched bytes → fail.
  *   - kerf/quote-extraction: a priced quote was extracted and snapshotted.
  */
 async function buildEvidenceBundle(args: BundleArgs): Promise<EvidenceBundle> {
   const items: EvidenceItem[] = [];
   const uploadIds: string[] = [];
   let uploadsOk = true;
+  let allUploaded = true;
   const observedHashes: string[] = [];
 
   for (const [idx, file] of args.intent.files.entries()) {
@@ -426,9 +476,15 @@ async function buildEvidenceBundle(args: BundleArgs): Promise<EvidenceBundle> {
     }
     const actual = await sha256HexBytes(bytes);
     if (actual !== file.sha256) uploadsOk = false;
-    const id = `upload:/files/${idx}`;
+    const uploaded = args.uploadedIndices.has(idx);
+    if (!uploaded) allUploaded = false;
+    const id = uploaded ? `upload:/files/${idx}` : `ingress:/files/${idx}`;
     uploadIds.push(id);
-    observedHashes.push(`${file.name}=${actual}`);
+    observedHashes.push(
+      uploaded
+        ? `${file.name}=${actual}`
+        : `${file.name}=${actual} (ingress only — not uploaded)`,
+    );
     items.push({
       id,
       kind: "upload_hash",
@@ -459,7 +515,11 @@ async function buildEvidenceBundle(args: BundleArgs): Promise<EvidenceBundle> {
       oracle: "kerf/upload-hash",
       verdict: uploadsOk ? "pass" : "fail",
       observed: observedHashes.join(", "),
-      ...(uploadsOk ? {} : { reason: "resolved bytes do not hash to the intent's FileRef sha256" }),
+      ...(!uploadsOk
+        ? { reason: "resolved bytes do not hash to the intent's FileRef sha256" }
+        : allUploaded
+          ? {}
+          : { reason: "verified at API ingress; not all files uploaded by playbook" }),
       evidence: uploadIds,
     },
     args.quote

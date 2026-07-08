@@ -5,7 +5,7 @@ import type { ConfiguratorIntent } from "@kerf/core";
 import { FIXTURES_B64, getFixtureBytes, getVendor } from "@kerf/registry";
 import type { QuoteApiDeps } from "./quote-api.ts";
 import { handleQuoteRequest, HostUnavailableError } from "./quote-api.ts";
-import { intentHash } from "./hash.ts";
+import { intentHash, sha256HexBytes } from "./hash.ts";
 import { MemoryJobStore } from "./job-store.ts";
 import type { JobRecord } from "./job-store.ts";
 import { ScriptedHost } from "./scripted-session.ts";
@@ -173,6 +173,77 @@ test("quote API: structural validation rejects bad intents with 400", async () =
     if (res.status !== 400) continue;
     assert.match(res.body.error, want);
   }
+});
+
+test("quote API: multi-file intent — upload-hash claim scopes to what was actually uploaded", async () => {
+  // The SCS quote playbook uploads /files/0 only. A second posted file is
+  // hash-verified at the API door but never fed to the vendor — the claim
+  // must say so instead of implying an upload that never happened.
+  const secondBytes = Buffer.from("kerf second plate — never reached by the playbook");
+  const intent = postedCanary();
+  (intent.files as Array<Record<string, unknown>>).push({
+    name: "second-plate.dxf",
+    bytes: secondBytes.length,
+    sha256: await sha256HexBytes(secondBytes),
+    media_type: "image/vnd.dxf",
+    bytes_base64: secondBytes.toString("base64"),
+  });
+
+  const res = await handleQuoteRequest({ vendor: "sendcutsend", intent }, makeDeps());
+  assert.equal(res.status, 200);
+  if (res.status !== 200) return;
+  assert.equal(res.body.state, "DELIVERED");
+
+  const claim = res.body.evidence.claims.find((c) => c.oracle === "kerf/upload-hash");
+  assert.ok(claim);
+  // Both files hash-true → still pass (fail-closed semantics untouched)…
+  assert.equal(claim!.verdict, "pass");
+  // …but the claim is honest about its scope.
+  assert.equal(claim!.reason, "verified at API ingress; not all files uploaded by playbook");
+  assert.match(claim!.observed ?? "", /kerf-canary-100x50\.dxf=[0-9a-f]{64}(,|$)/);
+  assert.match(
+    claim!.observed ?? "",
+    /second-plate\.dxf=[0-9a-f]{64} \(ingress only — not uploaded\)/,
+  );
+  assert.ok(claim!.evidence.includes("upload:/files/0"), "uploaded file keeps upload: evidence");
+  assert.ok(claim!.evidence.includes("ingress:/files/1"), "non-uploaded file is ingress: evidence");
+
+  // Single-file canary control: everything uploaded → no scoping reason.
+  const single = await handleQuoteRequest(
+    { vendor: "sendcutsend", intent: postedCanary() },
+    makeDeps(),
+  );
+  assert.equal(single.status, 200);
+  if (single.status !== 200) return;
+  const singleClaim = single.body.evidence.claims.find((c) => c.oracle === "kerf/upload-hash");
+  assert.equal(singleClaim!.verdict, "pass");
+  assert.equal(singleClaim!.reason, undefined);
+  assert.ok(singleClaim!.evidence.includes("upload:/files/0"));
+});
+
+test("quote API: size caps reject oversized posted intents before decode", async () => {
+  // Per-file cap: declared bytes over 25 MB → 400, no decode attempted.
+  const perFile = postedCanary();
+  (perFile.files as Array<Record<string, unknown>>)[0]!.bytes = 26 * 1024 * 1024;
+  const res1 = await handleQuoteRequest({ vendor: "sendcutsend", intent: perFile }, makeDeps());
+  assert.equal(res1.status, 400);
+  if (res1.status === 400) assert.match(res1.body.error, /per-file cap/);
+
+  // Total cap: three files under the per-file cap but 63 MB combined → 400.
+  const total = postedCanary();
+  const file0 = (total.files as Array<Record<string, unknown>>)[0]!;
+  total.files = [0, 1, 2].map((n) => ({ ...file0, name: `plate-${n}.dxf`, bytes: 21 * 1024 * 1024 }));
+  const res2 = await handleQuoteRequest({ vendor: "sendcutsend", intent: total }, makeDeps());
+  assert.equal(res2.status, 400);
+  if (res2.status === 400) assert.match(res2.body.error, /bytes total, over/);
+
+  // Payload larger than the declared size implies → 400 before decode.
+  const inflated = postedCanary();
+  (inflated.files as Array<Record<string, unknown>>)[0]!.bytes_base64 =
+    Buffer.alloc(4096).toString("base64");
+  const res3 = await handleQuoteRequest({ vendor: "sendcutsend", intent: inflated }, makeDeps());
+  assert.equal(res3.status, 400);
+  if (res3.status === 400) assert.match(res3.body.error, /larger than the declared/);
 });
 
 test("quote API: unknown registry intent key is 400", async () => {
