@@ -8,6 +8,8 @@
  * scripted host.
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import type { BrowserHost, QuoteApiDeps } from "@kerf/engine";
 import { HostUnavailableError, MemoryJobStore, ScriptedHost } from "@kerf/engine";
 import { BrowserUseHost } from "@kerf/engine/src/browser-use-host.ts";
@@ -23,22 +25,43 @@ let warnedOpenApi = false;
 /**
  * Bearer-token gate. When KERF_API_TOKEN is set, every request must carry
  * `Authorization: Bearer <token>` — anything else is 401. When it is NOT
- * set the API is open (dev mode) and we say so once in the logs rather
- * than failing silently open.
+ * set, the posture depends on where we are running:
+ *
+ *  - Deployed (`VERCEL` set, or NODE_ENV === "production"): FAIL CLOSED
+ *    with 503. A production deploy that forgot the token must not expose
+ *    an API that can spend Browser Use money.
+ *  - Local dev: open, announced once in the logs rather than failing
+ *    silently open.
  */
 export function checkAuth(req: Request): Response | null {
   const token = process.env.KERF_API_TOKEN;
   if (!token) {
+    if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+      return Response.json(
+        { error: "KERF_API_TOKEN not configured" },
+        { status: 503 },
+      );
+    }
     if (!warnedOpenApi) {
       warnedOpenApi = true;
       console.warn(
-        "kerf: KERF_API_TOKEN is not set — the HTTP API is OPEN (dev mode). Set it in production.",
+        "kerf: KERF_API_TOKEN is not set — the HTTP API is OPEN (local dev only; deployed environments fail closed).",
       );
     }
     return null;
   }
-  if (req.headers.get("authorization") === `Bearer ${token}`) return null;
+  const header = req.headers.get("authorization") ?? "";
+  if (bearerMatches(header, token)) return null;
   return Response.json({ error: "unauthorized" }, { status: 401 });
+}
+
+/** Constant-time bearer comparison. Both sides are hashed first so the
+ *  comparison runs over equal-length buffers — neither the token's content
+ *  nor its length leaks through timing. */
+function bearerMatches(header: string, token: string): boolean {
+  const a = createHash("sha256").update(header).digest();
+  const b = createHash("sha256").update(`Bearer ${token}`).digest();
+  return timingSafeEqual(a, b);
 }
 
 /** Bind a requested mode to a concrete BrowserHost. Live mode needs the
