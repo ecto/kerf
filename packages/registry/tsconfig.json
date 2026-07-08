@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "noEmit": true,
     "skipLibCheck": true,
