@@ -1,9 +1,11 @@
 /**
  * @kerf/engine — the deterministic playbook runner (Tier 1).
  *
- * Depends only on @kerf/core (types). The concrete BrowserHost adapters
- * (Browser Use cloud, etc.) live in the runtime layer and implement the
- * interface here; the engine never imports a vendor SDK.
+ * The core exported here depends only on @kerf/core (types) — it never
+ * imports a vendor SDK. The one concrete cloud adapter (BrowserUseHost)
+ * lives in `./browser-use-host.ts` and is deliberately NOT re-exported:
+ * the runtime layer deep-imports it, so consumers of the engine's
+ * deterministic core never pull in `browser-use-sdk`.
  */
 
 export type { BrowserHost, BrowserSession } from "./browser-host.ts";
@@ -25,3 +27,6 @@ export type { QuoteFromRunArgs } from "./quote-from-run.ts";
 export { canonicalJson, sha256Hex, intentHash } from "./hash.ts";
 export { runQuoteJob } from "./quote-job.ts";
 export type { RunQuoteJobArgs, QuoteJobResult } from "./quote-job.ts";
+export { ScriptedHost, ScriptedSession } from "./scripted-session.ts";
+export { MemoryJobStore } from "./job-store.ts";
+export type { JobRecord, JobRecordPatch, JobStore } from "./job-store.ts";

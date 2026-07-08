@@ -41,7 +41,11 @@ export const TRANSITIONS: Record<JobState, readonly JobState[]> = {
   TAKEOVER_WAIT: ["SESSION_OPEN", "STAGING", "STAGED", "CONFIRMING", "CANCELED", "FAILED"],
   // L1: human clicked buy in the live view → straight to CONFIRMING.
   // L2: the auditor gate sits between the cart and the click.
-  STAGED: ["AUDIT", "TAKEOVER_WAIT", "CONFIRMING", "CANCELED", "FAILED"],
+  // Quote-kind jobs terminate STAGED → DELIVERED: the priced,
+  // evidence-backed quote IS the deliverable — there is no money path, so
+  // none of the money invariants (one-shot PLACING, two-oracle CONFIRMED)
+  // are in play. Orders continue via AUDIT.
+  STAGED: ["AUDIT", "TAKEOVER_WAIT", "CONFIRMING", "DELIVERED", "CANCELED", "FAILED"],
   AUDIT: ["PLACING", "AUDIT_FAILED"],
   AUDIT_FAILED: [],
   PLACING: ["CONFIRMING", "RECONCILING"],
