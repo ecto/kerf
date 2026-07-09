@@ -7,9 +7,9 @@
  * runtime layers, which depend on this package and never the reverse.
  */
 
-export * from "./intent";
-export * from "./quote";
-export * from "./job";
-export * from "./evidence";
-export * from "./playbook";
-export * from "./registry";
+export * from "./intent.ts";
+export * from "./quote.ts";
+export * from "./job.ts";
+export * from "./evidence.ts";
+export * from "./playbook.ts";
+export * from "./registry.ts";

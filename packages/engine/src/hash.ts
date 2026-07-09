@@ -26,7 +26,13 @@ function sortKeys(value: unknown): unknown {
 /** SHA-256 of the canonical JSON, hex. */
 export async function sha256Hex(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(canonicalJson(value));
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return sha256HexBytes(bytes);
+}
+
+/** SHA-256 of raw bytes, hex — the primitive behind the `kerf/upload-hash`
+ *  oracle (uploaded bytes vs FileRef.sha256) and evidence-item manifests. */
+export async function sha256HexBytes(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
   return [...new Uint8Array(digest)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

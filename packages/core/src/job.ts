@@ -41,7 +41,11 @@ export const TRANSITIONS: Record<JobState, readonly JobState[]> = {
   TAKEOVER_WAIT: ["SESSION_OPEN", "STAGING", "STAGED", "CONFIRMING", "CANCELED", "FAILED"],
   // L1: human clicked buy in the live view → straight to CONFIRMING.
   // L2: the auditor gate sits between the cart and the click.
-  STAGED: ["AUDIT", "TAKEOVER_WAIT", "CONFIRMING", "CANCELED", "FAILED"],
+  // Quote-kind jobs terminate STAGED → DELIVERED: the priced,
+  // evidence-backed quote IS the deliverable — there is no money path, so
+  // none of the money invariants (one-shot PLACING, two-oracle CONFIRMED)
+  // are in play. Orders continue via AUDIT.
+  STAGED: ["AUDIT", "TAKEOVER_WAIT", "CONFIRMING", "DELIVERED", "CANCELED", "FAILED"],
   AUDIT: ["PLACING", "AUDIT_FAILED"],
   AUDIT_FAILED: [],
   PLACING: ["CONFIRMING", "RECONCILING"],
@@ -65,6 +69,27 @@ export function isTerminal(state: JobState): boolean {
 export function assertTransition(from: JobState, to: JobState): void {
   if (!TRANSITIONS[from].includes(to)) {
     throw new Error(`kerf: illegal job transition ${from} -> ${to}`);
+  }
+}
+
+/**
+ * Kind-aware transition guard — what stores must call. The shared table
+ * lists STAGED → DELIVERED, but that edge exists ONLY for quote-kind jobs
+ * (the priced, evidence-backed quote is the deliverable). For every other
+ * kind — orders above all — DELIVERED stays reachable only via TRACKING,
+ * preserving "DELIVERED implies the order was confirmed by two oracles".
+ */
+export function assertTransitionForKind(
+  kind: JobKind,
+  from: JobState,
+  to: JobState,
+): void {
+  assertTransition(from, to);
+  if (from === "STAGED" && to === "DELIVERED" && kind !== "quote") {
+    throw new Error(
+      `kerf: illegal job transition STAGED -> DELIVERED for kind "${kind}" — ` +
+        "only quote jobs terminate at STAGED; orders require the two-oracle CONFIRMED path",
+    );
   }
 }
 
